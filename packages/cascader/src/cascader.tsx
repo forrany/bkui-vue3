@@ -24,15 +24,17 @@
  * IN THE SOFTWARE.
 */
 
-import { computed, defineComponent, ref, toRefs, watch } from 'vue';
+import { computed, defineComponent, nextTick, ref, toRefs, watch } from 'vue';
 import { array } from 'vue-types';
 
 import { clickoutside } from '@bkui-vue/directives';
 import { AngleUp, Close, Error } from '@bkui-vue/icon';
 import BkPopover from '@bkui-vue/popover2';
 import { debounce, PropTypes } from '@bkui-vue/shared';
+import Tag from '@bkui-vue/tag';
 
 import { useHover } from '../../select/src/common';
+import { useTagsOverflow } from '../../tag-input/src/common';
 
 import CascaderPanel from './cascader-panel';
 import { INode } from './interface';
@@ -46,6 +48,7 @@ export default defineComponent({
   components: {
     CascaderPanel,
     BkPopover,
+    Tag,
   },
   props: {
     modelValue: PropTypes.arrayOf(PropTypes.oneOfType([array<string>(), String, Number])),
@@ -68,6 +71,10 @@ export default defineComponent({
     extCls: PropTypes.string.def(''),
     scrollHeight: PropTypes.oneOfType([PropTypes.number, PropTypes.string]).def(216),
     scrollWidth: PropTypes.oneOfType([PropTypes.number, PropTypes.string]).def('auto'),
+    collapseTags: {
+      type: Boolean,
+      default: true,
+    },
   },
   emits: ['update:modelValue', 'change', 'clear', 'toggle'],
   setup(props, { emit }) {
@@ -82,6 +89,8 @@ export default defineComponent({
     const searchKey = ref<string | number>('');  // 支持搜索时，搜索框绑定变量
     const suggestions = ref([]); // 搜索功能打开时，面板给出的列表
     const isFiltering = ref(false); // 是否正在搜索，过滤
+    const isShowPoper = ref(false);
+    const isFocus = ref(false);
 
     const checkedValue = computed({
       get: () => modelValue.value,
@@ -91,6 +100,8 @@ export default defineComponent({
     });
 
     const popover = ref(null);
+    const bkCascaderRef = ref(null);
+    const inputRef = ref(null);
 
     /** 根据配置，获取输入框显示的text */
     const getShowText = (node: INode) =>  (props.showCompleteName
@@ -149,6 +160,8 @@ export default defineComponent({
       /** 派发相关事件 */
       emit('update:modelValue', value);
       oldValue !== undefined && emit('change', value); // oldValue = undefined代表初始化，init不派发change事件
+      // 如果有过滤搜索，选择后，自动focus到input
+      inputRef?.value?.focus();
     };
 
     const listChangeHandler = () => {
@@ -158,6 +171,15 @@ export default defineComponent({
 
     const popoverChangeEmitter = (val) => {
       emit('toggle', val.isShow);
+
+      isShowPoper.value = val.isShow;
+
+      // popover激活后，focus相应事件
+      isFocus.value = val.isShow;
+      nextTick(() => {
+        val && inputRef.value?.focus();
+      });
+
       /** 面板收起，搜索状态关闭 */
       if (!val.isShow) {
         isFiltering.value = false;
@@ -193,7 +215,23 @@ export default defineComponent({
       { deep: true, immediate: true },
     );
 
+    /**
+     * 折叠tag(collapseTags)相关逻辑
+     * @params tagList: string 多选tag的name合集;
+     * @params isCollapse: boolean 是否折叠，当外部传入collapseTags参数且下拉面板打开时，才显示所有tags
+     */
+    const tagList = computed(() => selectedTags.value.map(item => item.text));
+    const isCollapse = computed(() => (props.collapseTags ? props.collapseTags && isShowPoper.value
+      : props.collapseTags));
+
+    const { overflowTagIndex } = useTagsOverflow(bkCascaderRef, isCollapse, tagList);
+
     return {
+      bkCascaderRef,
+      inputRef,
+      overflowTagIndex,
+      isCollapse,
+      isFocus,
       store,
       updateValue,
       panelShow,
@@ -208,6 +246,7 @@ export default defineComponent({
       removeTag,
       cascaderPanel,
       popoverChangeEmitter,
+      isShowPoper,
       searchKey,
       suggestions,
       isFiltering,
@@ -227,73 +266,89 @@ export default defineComponent({
         return <span>{this.selectedText}</span>;
       }
       return <div class="cascader-tag-list">
-        {this.selectedTags.map((tag, index) => (
-          <span class="cascader-tag-item">
-            <span class="cascader-tag-item-name">{tag.text}</span>
-            <Error class="bk-icon-clear-icon" onClick={(e: Event) => this.removeTag(this.modelValue, index, e)}></Error>
-          </span>
-        ))}
+        {this.selectedTags.map((tag, index) => {
+          const isOverflow = !this.isCollapse && this.overflowTagIndex && index >= this.overflowTagIndex;
+          return (
+            <span class="tag-item" style={{ display: isOverflow ? 'none' : '' }} key={tag}>
+              <span class="tag-item-name">{tag.text}</span>
+              <Error class="bk-icon-clear-icon" onClick={(e: Event) => this.removeTag(this.modelValue, index, e)}></Error>
+            </span>
+          );
+        })}
+        {
+          !!this.overflowTagIndex && !this.isCollapse && (
+            <Tag style="margin-top: 0">+{this.selectedTags.length - this.overflowTagIndex}</Tag>
+          )
+        }
       </div>;
     };
     return (
-      <div class={['bk-cascader', 'bk-cascader-wrapper', this.extCls, {
-        'bk-is-show-panel': this.panelShow,
-        'is-unselected': this.modelValue.length === 0,
-        'is-hover': this.isHover,
-        'is-filterable': this.filterable,
-      }]}
-        tabindex="0"
-        data-placeholder={this.placeholder}
-        onMouseenter={this.setHover}
-        onMouseleave={this.cancelHover}>
-        {suffixIcon()}
-        <BkPopover
-          placement="bottom-start"
-          theme="light bk-cascader-popover"
-          trigger="click"
-          arrow={false}
-          class="bk-cascader-popover-wrapper"
-          ref="popover"
-          onAfterHidden={this.popoverChangeEmitter}
-          onAfterShow={this.popoverChangeEmitter}
-          boundary="body">
-          {{
-            default: () => (
-              <div class="bk-cascader-name">
-                {this.multiple && this.selectedTags.length > 0 && renderTags()}
-                {this.filterable
-                  ? <input class="bk-cascader-search-input"
-                    type="text"
-                    onInput={this.searchInputHandler}
-                    placeholder={this.placeholder}
-                    value={this.searchKey}
-                  />
-                  : <span>{this.selectedText}</span>
-                }
-              </div>
-            ),
-            content: () => (
-              <div class="bk-cascader-popover">
-                <CascaderPanel
-                  store={this.store}
-                  ref="cascaderPanel"
-                  width={this.scrollWidth}
-                  height={this.scrollHeight}
-                  search-key={this.searchKey}
-                  separator={this.separator}
-                  is-filtering={this.isFiltering}
-                  suggestions={this.suggestions}
-                  v-model={this.checkedValue}
-                  v-slots={{
-                    default: scope => (this.$slots.default
-                      ? this.$slots.default(scope)
-                      : <span class="bk-cascader-node-name">{scope.node.name}</span>),
-                  }}>
-                </CascaderPanel>
-              </div>
-            ),
+      <div>
+        <div class={['bk-cascader', 'bk-cascader-wrapper', this.extCls, {
+          'bk-is-show-panel': this.panelShow,
+          'is-unselected': this.modelValue.length === 0,
+          'is-hover': this.isHover,
+          'is-filterable': this.filterable,
+          'is-focus': this.isFocus,
+        }]}
+          tabindex="0"
+          data-placeholder={this.placeholder}
+          onMouseenter={this.setHover}
+          onMouseleave={this.cancelHover}
+          onFocus={() => {
+            console.log('focus');
           }}
-        </BkPopover>
+          ref="bkCascaderRef">
+          {suffixIcon()}
+          <BkPopover
+            placement="bottom-start"
+            theme="light bk-cascader-popover"
+            trigger="click"
+            arrow={false}
+            class="bk-cascader-popover-wrapper"
+            ref="popover"
+            onAfterHidden={this.popoverChangeEmitter}
+            onAfterShow={this.popoverChangeEmitter}
+            boundary="body">
+            {{
+              default: () => (
+                <div class="bk-cascader-name">
+                  {this.multiple && this.selectedTags.length > 0 && renderTags()}
+                  {this.filterable
+                    ? (this.isCollapse || this.selectedTags.length === 0) && <input class="bk-cascader-search-input"
+                      type="text"
+                      onInput={this.searchInputHandler}
+                      placeholder={this.placeholder}
+                      value={this.searchKey}
+                      ref="inputRef"
+                    />
+                    : <span>{this.selectedText}</span>
+                  }
+                </div>
+              ),
+              content: () => (
+                <div class="bk-cascader-popover">
+                  <CascaderPanel
+                    store={this.store}
+                    ref="cascaderPanel"
+                    width={this.scrollWidth}
+                    height={this.scrollHeight}
+                    search-key={this.searchKey}
+                    separator={this.separator}
+                    is-filtering={this.isFiltering}
+                    suggestions={this.suggestions}
+                    v-model={this.checkedValue}
+                    v-slots={{
+                      default: scope => (this.$slots.default
+                        ? this.$slots.default(scope)
+                        : <span class="bk-cascader-node-name">{scope.node.name}</span>),
+                    }}>
+                  </CascaderPanel>
+                </div>
+              ),
+            }}
+          </BkPopover>
+        </div>
       </div>
     );
   },

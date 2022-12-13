@@ -240,6 +240,7 @@ export default defineComponent({
               >
                 {node.config.multiple && (
                   <BkCheckbox
+                    style="margin-right: 5px;"
                     disabled={node.isDisabled}
                     v-model={node.checked}
                     indeterminate={node.isIndeterminate}
