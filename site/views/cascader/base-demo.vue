@@ -69,7 +69,7 @@
       ],
     },
   ];
-  const area = ref([]);
+  const area = ref(['guangxi']);
   const hoverArea = ref([]);
 
 </script>

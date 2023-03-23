@@ -53,6 +53,14 @@ class Store {
     return this.nodes;
   }
 
+  setChecked(ids: string[]) {
+    if (ids.length === 0) return;
+    this.getFlattedNodes().forEach((node: INode) => {
+      debugger;
+      console.log(node);
+    });
+  }
+
   /** 清空所有checked */
   clearChecked() {
     this.getFlattedNodes().forEach((node: INode) => {

@@ -117,6 +117,8 @@ export default defineComponent({
     const updateValue = (val: Array<string | number | string[]>) => {
       /** 根据配置更新显示内容 */
       if (multiple) {
+        console.log(val, 'fuck here');
+        store.value.setChecked(val as string[]);
         selectedTags.value = store.value.getCheckedNodes().map((node: INode) => ({
           text: getShowText(node),
           key: node.id,
@@ -157,6 +159,7 @@ export default defineComponent({
 
     const modelValueChangeHandler = (value, oldValue) => {
       updateValue(value);
+      console.log(value, 'modelValue');
       /** 派发相关事件 */
       emit('update:modelValue', value);
       oldValue !== undefined && emit('change', value); // oldValue = undefined代表初始化，init不派发change事件

@@ -70,7 +70,7 @@
       ],
     },
   ];
-  const area = ref([]);
+  const area = ref([['guangxi']]);
 
 </script>
 
