@@ -5,6 +5,8 @@
       :data="tableData"
       row-hover="auto"
       settings
+      stripe
+      :border="['col', 'row']"
       show-overflow-tooltip
       @dblclick="handleDblClick"
       @column-sort="handleSortBy"

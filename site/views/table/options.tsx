@@ -351,6 +351,7 @@ export const DATE_COL_SPAN = [
     label: '来源',
     field: 'source',
     width: 80,
+    rowspan: ({ rowIndex }) => ([0, 1, 2].includes(rowIndex) ? 2 : 1),
     filter: {
       list: [
         { text: 'Resolving deltas: 100% (16/16), completed with 15 local objects', value: 'QQ' },
@@ -362,12 +363,13 @@ export const DATE_COL_SPAN = [
   {
     label: '创建时间',
     field: 'create_time',
-    rowspan: ({ rowIndex }) => (rowIndex > 2 ? 2 : 1),
+    rowspan: ({ rowIndex }) => ([0, 1, 2].includes(rowIndex) ? 2 : 1),
     sort: 'custom',
   },
   {
     label: (column, index) => `状态-${index}-${column.field}`,
     field: 'status',
     sort: true,
+    rowspan: ({ rowIndex }) => ([0, 1, 2].includes(rowIndex) ? 2 : 1),
   },
 ];
