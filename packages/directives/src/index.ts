@@ -28,4 +28,5 @@ export { default as bkEllipsis, createInstance as bkEllipsisInstance } from './e
 export { default as mousewheel } from './mousewheel';
 export { default as bkTooltips } from './tooltips';
 export { overflowTitle } from '@bkui-vue/overflow-title';
+export { vBkloading as bkLoading } from '@bkui-vue/loading/src/directive';
 // export { createInstance as bkEllipsisInstance } from './ellipsis';
